@@ -4,6 +4,10 @@ if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 }
 
+interface TextItem {
+  str: string;
+}
+
 export async function extractTextFromPDF(file: File): Promise<string> {
   try {
     const arrayBuffer = await file.arrayBuffer();
@@ -17,7 +21,7 @@ export async function extractTextFromPDF(file: File): Promise<string> {
       const textContent = await page.getTextContent();
       
       const pageText = textContent.items
-        .map((item: any) => item.str)
+        .map((item: TextItem) => item.str)
         .join(' ');
       
       fullText += pageText + '\n\n';

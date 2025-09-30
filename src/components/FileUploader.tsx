@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Upload, File, X, CheckCircle } from 'lucide-react';
+import { Upload, X, CheckCircle } from 'lucide-react';
 
 interface FileUploaderProps {
   onFileSelect: (file: File) => void;
@@ -11,6 +11,22 @@ interface FileUploaderProps {
 
 export default function FileUploader({ onFileSelect, selectedFile, onClear }: FileUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
+
+  const validateAndSelectFile = useCallback((file: File) => {
+    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    
+    if (!validTypes.includes(file.type)) {
+      alert('Por favor, envie apenas arquivos PDF ou DOCX');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Arquivo muito grande! Máximo 10MB');
+      return;
+    }
+
+    onFileSelect(file);
+  }, [onFileSelect]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -38,29 +54,13 @@ export default function FileUploader({ onFileSelect, selectedFile, onClear }: Fi
     if (files && files[0]) {
       validateAndSelectFile(files[0]);
     }
-  }, []);
+  }, [validateAndSelectFile]);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files[0]) {
       validateAndSelectFile(files[0]);
     }
-  };
-
-  const validateAndSelectFile = (file: File) => {
-    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-    
-    if (!validTypes.includes(file.type)) {
-      alert('Por favor, envie apenas arquivos PDF ou DOCX');
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      alert('Arquivo muito grande! Máximo 10MB');
-      return;
-    }
-
-    onFileSelect(file);
   };
 
   if (selectedFile) {
