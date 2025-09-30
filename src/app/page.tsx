@@ -5,8 +5,7 @@ import FileUploader from '@/components/FileUploader';
 import LanguageSelector from '@/components/LanguageSelector';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import TranslationResult from '@/components/TranslationResult';
-import { extractTextFromPDF } from '@/lib/pdf-extractor';
-import { extractTextFromDOCX } from '@/lib/docx-extractor';
+import { extractTextFromPDF, extractTextFromDOCX } from '@/lib/client-only-extractor';
 import { loadTranslator, translateText } from '@/lib/translator';
 import { Sparkles } from 'lucide-react';
 
