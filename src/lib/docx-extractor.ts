@@ -1,4 +1,5 @@
-import mammoth from 'mammoth/mammoth.browser';
+// @ts-ignore - Mammoth não tem tipos completos para browser
+import * as mammoth from 'mammoth';
 
 export async function extractTextFromDOCX(file: File): Promise<string> {
   try {
