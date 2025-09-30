@@ -8,6 +8,10 @@ interface TextItem {
   str: string;
 }
 
+interface TextMarkedContent {
+  type: string;
+}
+
 export async function extractTextFromPDF(file: File): Promise<string> {
   try {
     const arrayBuffer = await file.arrayBuffer();
@@ -21,7 +25,12 @@ export async function extractTextFromPDF(file: File): Promise<string> {
       const textContent = await page.getTextContent();
       
       const pageText = textContent.items
-        .map((item: TextItem) => item.str)
+        .map((item: TextItem | TextMarkedContent) => {
+          if ('str' in item) {
+            return item.str;
+          }
+          return '';
+        })
         .join(' ');
       
       fullText += pageText + '\n\n';
