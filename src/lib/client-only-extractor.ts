@@ -1,6 +1,6 @@
 'use client';
 
-export async function extractTextFromPDF(file: File): Promise<string> {
+export async function extractTextFromPDF(file: File, maxPages?: number): Promise<string> {
   try {
     const pdfjsLib = await import('pdfjs-dist');
     
@@ -18,10 +18,17 @@ export async function extractTextFromPDF(file: File): Promise<string> {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     
+    const totalPages = pdf.numPages;
+    const pagesToExtract = maxPages && maxPages < totalPages ? maxPages : totalPages;
+    
     let fullText = '';
-    const numPages = pdf.numPages;
 
-    for (let i = 1; i <= numPages; i++) {
+    // Adicionar informação sobre quantas páginas estão sendo extraídas
+    if (maxPages && maxPages < totalPages) {
+      fullText += `[Extraindo ${pagesToExtract} de ${totalPages} páginas]\n\n`;
+    }
+
+    for (let i = 1; i <= pagesToExtract; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
       
@@ -34,7 +41,7 @@ export async function extractTextFromPDF(file: File): Promise<string> {
         })
         .join(' ');
       
-      fullText += pageText + '\n\n';
+      fullText += `--- Página ${i} ---\n${pageText}\n\n`;
     }
 
     return fullText.trim();
