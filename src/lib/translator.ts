@@ -1,50 +1,33 @@
 'use client';
 
-import { pipeline, env } from '@xenova/transformers';
-
-// Configurar ambiente do Transformers.js
-if (typeof window !== 'undefined') {
-  env.allowLocalModels = false;
-  env.allowRemoteModels = true;
-  env.useBrowserCache = true;
-  env.backends.onnx.wasm.numThreads = 1;
-}
-
-interface TranslationPipeline {
-  (text: string, options: { src_lang: string; tgt_lang: string }): Promise<Array<{ translation_text: string }>>;
-}
-
-interface ProgressCallback {
-  status?: string;
-  loaded?: number;
-  total?: number;
-}
-
-let translatorInstance: TranslationPipeline | null = null;
+let translatorReady = false;
 
 export async function loadTranslator(
   onProgress?: (progress: number) => void
 ): Promise<void> {
-  if (translatorInstance) return;
-
-  try {
-    translatorInstance = await pipeline(
-      'translation',
-      'Xenova/nllb-200-distilled-600M',
-      {
-        progress_callback: (progress: ProgressCallback) => {
-          if (onProgress && progress.status === 'progress' && progress.loaded && progress.total) {
-            const percentage = Math.round((progress.loaded / progress.total) * 100);
-            onProgress(percentage);
-          }
-        },
-      }
-    ) as TranslationPipeline;
-  } catch (error) {
-    console.error('Erro ao carregar modelo de tradução:', error);
-    throw new Error('Falha ao carregar o modelo de tradução');
+  // Simular carregamento para manter a UX
+  if (onProgress) {
+    for (let i = 0; i <= 100; i += 20) {
+      onProgress(i);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
   }
+  translatorReady = true;
 }
+
+// Mapeamento de códigos NLLB para códigos ISO
+const langMap: Record<string, string> = {
+  'por_Latn': 'pt',
+  'eng_Latn': 'en',
+  'spa_Latn': 'es',
+  'fra_Latn': 'fr',
+  'deu_Latn': 'de',
+  'ita_Latn': 'it',
+  'rus_Cyrl': 'ru',
+  'jpn_Jpan': 'ja',
+  'zho_Hans': 'zh',
+  'ara_Arab': 'ar',
+};
 
 export async function translateText(
   text: string,
@@ -52,48 +35,111 @@ export async function translateText(
   targetLang: string,
   onProgress?: (current: number, total: number) => void
 ): Promise<string> {
-  if (!translatorInstance) {
-    throw new Error('Tradutor não foi carregado. Chame loadTranslator() primeiro.');
+  if (!translatorReady) {
+    throw new Error('Tradutor não foi carregado');
+  }
+
+  const source = langMap[sourceLang] || 'pt';
+  const target = langMap[targetLang] || 'en';
+
+  // Se os idiomas são iguais, retornar texto original
+  if (source === target) {
+    return text;
   }
 
   try {
-    const chunks = chunkText(text, 512);
+    // Dividir em chunks menores (LibreTranslate funciona melhor com chunks pequenos)
+    const chunks = chunkText(text, 500);
     const translatedChunks: string[] = [];
 
     for (let i = 0; i < chunks.length; i++) {
-      const result = await translatorInstance(chunks[i], {
-        src_lang: sourceLang,
-        tgt_lang: targetLang,
+      const response = await fetch('https://libretranslate.com/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          q: chunks[i],
+          source: source,
+          target: target,
+          format: 'text',
+        }),
       });
 
-      translatedChunks.push(result[0].translation_text);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Erro da API:', errorData);
+        throw new Error(`Erro na tradução: ${response.status}`);
+      }
+
+      const data = await response.json();
+      translatedChunks.push(data.translatedText);
       
       if (onProgress) {
         onProgress(i + 1, chunks.length);
+      }
+
+      // Pequeno delay entre requests para não sobrecarregar API gratuita
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
 
     return translatedChunks.join(' ');
   } catch (error) {
-    console.error('Erro ao traduzir texto:', error);
-    throw new Error('Falha na tradução');
+    console.error('Erro ao traduzir:', error);
+    if (error instanceof Error) {
+      throw new Error(`Falha na tradução: ${error.message}`);
+    }
+    throw new Error('Falha na tradução. Tente novamente.');
   }
 }
 
 function chunkText(text: string, maxLength: number): string[] {
+  // Tentar dividir por sentenças primeiro
   const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
   const chunks: string[] = [];
   let current = '';
 
   for (const sentence of sentences) {
-    if ((current + sentence).length > maxLength) {
+    const trimmedSentence = sentence.trim();
+    
+    // Se uma única sentença é maior que maxLength, dividir por palavras
+    if (trimmedSentence.length > maxLength) {
+      if (current) {
+        chunks.push(current.trim());
+        current = '';
+      }
+      
+      // Dividir sentença longa em pedaços menores
+      const words = trimmedSentence.split(' ');
+      let tempChunk = '';
+      
+      for (const word of words) {
+        if ((tempChunk + ' ' + word).length > maxLength) {
+          if (tempChunk) chunks.push(tempChunk.trim());
+          tempChunk = word;
+        } else {
+          tempChunk += (tempChunk ? ' ' : '') + word;
+        }
+      }
+      
+      if (tempChunk) chunks.push(tempChunk.trim());
+      continue;
+    }
+    
+    // Adicionar sentença ao chunk atual
+    if ((current + ' ' + trimmedSentence).length > maxLength) {
       if (current) chunks.push(current.trim());
-      current = sentence;
+      current = trimmedSentence;
     } else {
-      current += sentence;
+      current += (current ? ' ' : '') + trimmedSentence;
     }
   }
 
-  if (current) chunks.push(current.trim());
-  return chunks;
+  if (current) {
+    chunks.push(current.trim());
+  }
+
+  return chunks.filter(chunk => chunk.length > 0);
 }
