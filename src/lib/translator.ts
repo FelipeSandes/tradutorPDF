@@ -50,41 +50,66 @@ export async function translateText(
   try {
     // MyMemory API - totalmente grátis, sem API key
     // Dividir em chunks menores (MyMemory tem limite de 500 caracteres por request)
-    const chunks = chunkText(text, 450);
+    const chunks = chunkText(text, 400); // Reduzi para 400 para ser mais seguro
     const translatedChunks: string[] = [];
 
     for (let i = 0; i < chunks.length; i++) {
-      const encodedText = encodeURIComponent(chunks[i]);
-      const url = `https://api.mymemory.translated.net/get?q=${encodedText}&langpair=${source}|${target}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
+      let success = false;
+      let retries = 0;
+      const maxRetries = 3;
 
-      if (!response.ok) {
-        console.error('Erro da API MyMemory:', response.status);
-        throw new Error(`Erro na tradução: ${response.status}`);
+      while (!success && retries < maxRetries) {
+        try {
+          const encodedText = encodeURIComponent(chunks[i]);
+          const url = `https://api.mymemory.translated.net/get?q=${encodedText}&langpair=${source}|${target}`;
+          
+          const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+            },
+          });
+
+          if (response.status === 429) {
+            // Rate limit - esperar mais tempo
+            const waitTime = (retries + 1) * 2000; // 2s, 4s, 6s
+            console.log(`Rate limit atingido. Aguardando ${waitTime}ms...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            retries++;
+            continue;
+          }
+
+          if (!response.ok) {
+            console.error('Erro da API MyMemory:', response.status);
+            throw new Error(`Erro na tradução: ${response.status}`);
+          }
+
+          const data = await response.json();
+          
+          if (data.responseStatus !== 200) {
+            console.error('Erro da API:', data);
+            throw new Error('Erro ao traduzir. Tente com um texto menor.');
+          }
+
+          translatedChunks.push(data.responseData.translatedText);
+          success = true;
+          
+        } catch (error) {
+          if (retries >= maxRetries - 1) {
+            throw error;
+          }
+          retries++;
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
-
-      const data = await response.json();
-      
-      if (data.responseStatus !== 200) {
-        console.error('Erro da API:', data);
-        throw new Error('Erro ao traduzir. Tente com um texto menor.');
-      }
-
-      translatedChunks.push(data.responseData.translatedText);
       
       if (onProgress) {
         onProgress(i + 1, chunks.length);
       }
 
-      // Delay entre requests (MyMemory tem limite de taxa)
+      // Delay maior entre requests para evitar rate limit
       if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 800)); // Aumentei para 800ms
       }
     }
 
@@ -94,7 +119,7 @@ export async function translateText(
     if (error instanceof Error) {
       throw new Error(`Falha na tradução: ${error.message}`);
     }
-    throw new Error('Falha na tradução. Tente novamente.');
+    throw new Error('Falha na tradução. Tente novamente em alguns segundos.');
   }
 }
 
