@@ -3,17 +3,7 @@ import { pipeline, env } from '@xenova/transformers';
 env.allowLocalModels = true;
 env.allowRemoteModels = true;
 
-interface TranslationPipeline {
-  (text: string, options: { src_lang: string; tgt_lang: string }): Promise<Array<{ translation_text: string }>>;
-}
-
-interface ProgressCallback {
-  status?: string;
-  loaded?: number;
-  total?: number;
-}
-
-let translatorInstance: TranslationPipeline | null = null;
+let translatorInstance: any = null;
 
 export async function loadTranslator(
   onProgress?: (progress: number) => void
@@ -25,14 +15,14 @@ export async function loadTranslator(
       'translation',
       'Xenova/nllb-200-distilled-600M',
       {
-        progress_callback: (progress: ProgressCallback) => {
-          if (onProgress && progress.status === 'progress' && progress.loaded && progress.total) {
+        progress_callback: (progress: any) => {
+          if (onProgress && progress.status === 'progress') {
             const percentage = Math.round((progress.loaded / progress.total) * 100);
             onProgress(percentage);
           }
         },
       }
-    ) as TranslationPipeline;
+    );
   } catch (error) {
     console.error('Erro ao carregar modelo de tradução:', error);
     throw new Error('Falha ao carregar o modelo de tradução');
