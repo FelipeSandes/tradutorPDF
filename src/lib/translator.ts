@@ -2,8 +2,13 @@
 
 import { pipeline, env } from '@xenova/transformers';
 
-env.allowLocalModels = true;
-env.allowRemoteModels = true;
+// Configurar ambiente do Transformers.js
+if (typeof window !== 'undefined') {
+  env.allowLocalModels = false;
+  env.allowRemoteModels = true;
+  env.useBrowserCache = true;
+  env.backends.onnx.wasm.numThreads = 1;
+}
 
 interface TranslationPipeline {
   (text: string, options: { src_lang: string; tgt_lang: string }): Promise<Array<{ translation_text: string }>>;
