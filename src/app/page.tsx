@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import FileUploader from '@/components/FileUploader';
-import LanguageSelector from '@/components/LanguageSelector';
-import LoadingSpinner from '@/components/LoadingSpinner';
-import TranslationResult from '@/components/TranslationResult';
-import { extractTextFromPDF, extractTextFromDOCX } from '@/lib/client-only-extractor';
-import { loadTranslator, translateText } from '@/lib/translator';
+import dynamic from 'next/dynamic';
 import { Sparkles } from 'lucide-react';
+
+// Dynamic imports para componentes
+const FileUploader = dynamic(() => import('@/components/FileUploader'), { ssr: false });
+const LanguageSelector = dynamic(() => import('@/components/LanguageSelector'), { ssr: false });
+const LoadingSpinner = dynamic(() => import('@/components/LoadingSpinner'), { ssr: false });
+const TranslationResult = dynamic(() => import('@/components/TranslationResult'), { ssr: false });
 
 type AppState = 'idle' | 'loading-model' | 'extracting' | 'translating' | 'complete';
 
@@ -25,6 +26,10 @@ export default function Home() {
     if (!selectedFile) return;
 
     try {
+      // Importar dinamicamente as funções
+      const { extractTextFromPDF, extractTextFromDOCX } = await import('@/lib/client-only-extractor');
+      const { loadTranslator, translateText: translate } = await import('@/lib/translator');
+
       // Extrair texto
       setState('extracting');
       setStatusMessage('Extraindo texto do documento...');
@@ -50,7 +55,7 @@ export default function Home() {
       setStatusMessage('Traduzindo documento...');
       setProgress(0);
 
-      const translated = await translateText(
+      const translated = await translate(
         text,
         sourceLang,
         targetLang,
