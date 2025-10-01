@@ -1,21 +1,20 @@
 'use client';
 
 export async function extractTextFromPDF(file: File): Promise<string> {
-  const pdfjsLib = await import('pdfjs-dist');
-  
-  if (typeof window !== 'undefined') {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-  }
-
-  interface TextItem {
-    str: string;
-  }
-
-  interface TextMarkedContent {
-    type: string;
-  }
-
   try {
+    const pdfjsLib = await import('pdfjs-dist');
+    
+    // Usar worker de um CDN alternativo (jsDelivr é mais confiável)
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+    interface TextItem {
+      str: string;
+    }
+
+    interface TextMarkedContent {
+      type: string;
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     
@@ -41,7 +40,7 @@ export async function extractTextFromPDF(file: File): Promise<string> {
     return fullText.trim();
   } catch (error) {
     console.error('Erro ao extrair texto do PDF:', error);
-    throw new Error('Falha ao processar PDF');
+    throw new Error('Falha ao processar PDF: ' + (error instanceof Error ? error.message : 'erro desconhecido'));
   }
 }
 
