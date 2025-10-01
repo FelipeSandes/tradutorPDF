@@ -9,6 +9,7 @@ const FileUploader = dynamic(() => import('@/components/FileUploader'), { ssr: f
 const LanguageSelector = dynamic(() => import('@/components/LanguageSelector'), { ssr: false });
 const LoadingSpinner = dynamic(() => import('@/components/LoadingSpinner'), { ssr: false });
 const TranslationResult = dynamic(() => import('@/components/TranslationResult'), { ssr: false });
+const PageSelector = dynamic(() => import('@/components/PageSelector'), { ssr: false });
 
 type AppState = 'idle' | 'loading-model' | 'extracting' | 'translating' | 'complete';
 
@@ -21,6 +22,7 @@ export default function Home() {
   const [translatedText, setTranslatedText] = useState('');
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
+  const [maxPages, setMaxPages] = useState<number | null>(5); // Padrão: 5 páginas
 
   const handleTranslate = async () => {
     if (!selectedFile) return;
@@ -36,7 +38,7 @@ export default function Home() {
       
       let text = '';
       if (selectedFile.type === 'application/pdf') {
-        text = await extractTextFromPDF(selectedFile);
+        text = await extractTextFromPDF(selectedFile, maxPages ?? undefined);
       } else {
         text = await extractTextFromDOCX(selectedFile);
       }
@@ -45,7 +47,7 @@ export default function Home() {
 
       // Carregar modelo
       setState('loading-model');
-      setStatusMessage('Carregando modelo de tradução...');
+      setStatusMessage('Preparando tradução...');
       setProgress(0);
       
       await loadTranslator((prog) => setProgress(prog));
@@ -68,9 +70,19 @@ export default function Home() {
       setTranslatedText(translated);
       setState('complete');
     } catch (error) {
-      console.error('Erro:', error);
-      alert('Erro ao processar documento. Tente novamente.');
+      console.error('Erro completo:', error);
+      
+      let errorMessage = 'Erro ao processar documento.';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        console.error('Mensagem de erro:', error.message);
+        console.error('Stack trace:', error.stack);
+      }
+      
+      alert(`Erro: ${errorMessage}\n\nVerifique o console do navegador (F12) para mais detalhes.`);
       setState('idle');
+      setProgress(0);
     }
   };
 
@@ -80,6 +92,7 @@ export default function Home() {
     setTranslatedText('');
     setState('idle');
     setProgress(0);
+    setMaxPages(5); // Reset para padrão
   };
 
   return (
@@ -123,6 +136,12 @@ export default function Home() {
               
               {selectedFile && (
                 <>
+                  <PageSelector
+                    maxPages={maxPages}
+                    onMaxPagesChange={setMaxPages}
+                    fileType={selectedFile.type}
+                  />
+                  
                   <LanguageSelector
                     sourceLang={sourceLang}
                     targetLang={targetLang}
@@ -135,6 +154,11 @@ export default function Home() {
                     className="glass-button w-full"
                   >
                     ✨ Traduzir Documento
+                    {maxPages && selectedFile.type === 'application/pdf' && (
+                      <span className="text-sm font-normal ml-2">
+                        ({maxPages} página{maxPages > 1 ? 's' : ''})
+                      </span>
+                    )}
                   </button>
                 </>
               )}
@@ -147,9 +171,9 @@ export default function Home() {
               progress={state === 'extracting' ? undefined : progress}
               subMessage={
                 state === 'loading-model'
-                  ? 'Isso pode levar alguns minutos na primeira vez...'
+                  ? 'Configurando tradução...'
                   : state === 'translating'
-                  ? 'Processando chunks de texto...'
+                  ? 'Processando texto em partes...'
                   : undefined
               }
             />
@@ -176,7 +200,7 @@ export default function Home() {
 
         {/* Footer */}
         <div className="text-center mt-16 text-gray-400 text-sm">
-          <p>Feito com ❤️ usando Next.js, Transformers.js e IA</p>
+          <p>Feito com ❤️ usando Next.js e IA • API de Tradução: MyMemory</p>
         </div>
       </div>
     </main>
