@@ -30,7 +30,7 @@ export default function Home() {
     try {
       // Importar dinamicamente as funções
       const { extractTextFromPDF, extractTextFromDOCX } = await import('@/lib/client-only-extractor');
-      const { loadTranslator, translateText: translate } = await import('@/lib/translator');
+      const { loadTranslator, translateText: translate } = await import('@/lib/transformers-translator');
 
       // Extrair texto
       setState('extracting');

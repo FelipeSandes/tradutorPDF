@@ -10,7 +10,7 @@ const nextConfig = {
       'onnxruntime-node$': false,
     };
     
-    // Configuração específica para Transformers.js
+    // Configuração para Transformers.js funcionar no navegador
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -27,10 +27,7 @@ const nextConfig = {
 
     return config;
   },
-  experimental: {
-    webpackBuildWorker: true,
-  },
-  // Headers necessários para SharedArrayBuffer (usado pelo ONNX)
+  // Headers necessários para SharedArrayBuffer (ONNX)
   async headers() {
     return [
       {
